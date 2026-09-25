@@ -1,0 +1,5 @@
+[
+ "runtime/poky/qemuriscv64/core-image-ptest-bzip2.json",
+ "runtime/poky/qemuriscv64/core-image-ptest-coreutils.json",
+ "runtime/poky/qemuriscv64/core-image-ptest-gnutls.json"
+]

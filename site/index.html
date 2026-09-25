@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yocto Autobuilder Test Duration Trends</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --grid: #e4e3df;
+  --series-1: #2a78d6; --good: #008300; --warn: #c98500; --bad: #e34948; --neutral: #8a8984;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --grid: #383835;
+    --series-1: #3987e5; --good: #2f9e2f; --warn: #c98500; --bad: #e66767; --neutral: #8a8984;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --grid: #383835;
+  --series-1: #3987e5; --good: #2f9e2f; --warn: #c98500; --bad: #e66767; --neutral: #8a8984;
+}
+body { margin: 0; padding: 16px; background: var(--surface); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
+main { max-width: 1100px; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 4px; }
+h2 { font-size: 1rem; margin: 24px 0 8px; }
+p, .muted { color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); min-width: 0; flex: 1 1 280px; }
+select { font: inherit; padding: 6px; max-width: 100%; }
+.tiles { display: flex; flex-wrap: wrap; gap: 12px; }
+.tile { flex: 1 1 130px; border: 1px solid var(--grid); border-radius: 8px; padding: 12px; }
+.tile b { display: block; font-size: 1.5rem; }
+.chart { position: relative; height: 320px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: .85rem; width: 100%; }
+td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+a { color: var(--series-1); }
+</style>
+</head>
+<body>
+<main>
+<h1>Yocto test trends</h1>
+<p>Test durations and results over time, from <a href="https://git.yoctoproject.org/yocto-testresults/">yocto-testresults</a> (master).</p>
+
+<div class="controls">
+  <label>Result set <select id="file"></select></label>
+  <label>Duration metric <select id="metric"></select></label>
+</div>
+
+<div class="tiles" id="tiles"></div>
+
+<h2 id="dur-title">Duration</h2>
+<div class="chart"><canvas id="dur" aria-label="Duration over time"></canvas></div>
+
+<h2>Result counts</h2>
+<div class="chart"><canvas id="status" aria-label="Result counts over time"></canvas></div>
+
+<details>
+  <summary>Table view (latest 50 runs)</summary>
+  <div class="scroll"><table id="table"></table></div>
+</details>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const $ = id => document.getElementById(id);
+const STATUS = { PASSED: '--good', FAILED: '--bad', ERROR: '--bad', SKIPPED: '--neutral', EXPECTEDFAIL: '--warn' };
+const toDate = s => new Date(Date.UTC(+s.slice(0, 4), s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(8, 10), +s.slice(10, 12)));
+const day = t => new Date(t).toISOString().slice(0, 10);
+const fmtDur = s => s === 0 ? '0' : s >= 60 ? `${(s / 60).toFixed(1)} min` : `${s.toFixed(3)} s`;
+let runs = [], charts = {};
+
+function chart(id, datasets, fmt) {
+  charts[id]?.destroy();
+  charts[id] = new Chart($(id), {
+    type: 'line',
+    data: { datasets },
+    options: {
+      maintainAspectRatio: false, animation: false, parsing: false, normalized: true,
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      elements: { line: { borderWidth: 2 }, point: { radius: 0, hoverRadius: 5, hitRadius: 8 } },
+      scales: {
+        x: { type: 'linear', min: runs[0]?.t, max: runs.at(-1)?.t, ticks: { callback: day, color: css('--muted'), maxTicksLimit: 8 }, grid: { color: css('--grid') } },
+        y: { beginAtZero: true, ticks: { callback: fmt, color: css('--muted') }, grid: { color: css('--grid') } },
+      },
+      plugins: {
+        legend: { display: datasets.length > 1, labels: { color: css('--text') } },
+        tooltip: { callbacks: {
+          title: items => { const r = runs[items[0].dataIndex]; return `${day(items[0].parsed.x)}  poky ${(r.commit || '').slice(0, 10)}`; },
+          label: i => `${i.dataset.label}: ${fmt(i.parsed.y)}`,
+        } },
+      },
+    },
+  });
+}
+
+function metricValue(r, m) {
+  return (m[0] === 's' ? r.sections : r.durations)[m.slice(2)] ?? null;
+}
+
+function drawDuration() {
+  const m = $('metric').value, label = m.slice(2);
+  $('dur-title').textContent = `Duration: ${label}`;
+  chart('dur', [{ label, borderColor: css('--series-1'), backgroundColor: css('--series-1'), showLine: false, pointRadius: 3, pointHoverRadius: 6,
+    data: runs.map(r => ({ x: r.t, y: metricValue(r, m) })) }], fmtDur);
+
+  const vals = runs.map(r => metricValue(r, m)).filter(v => v != null);
+  const last = vals.at(-1), prev = vals.slice(-11, -1).sort((a, b) => a - b), med = prev[prev.length >> 1];
+  const delta = med ? ((last - med) / med * 100).toFixed(1) : null;
+  const lastRun = runs.at(-1), total = Object.values(lastRun.status).reduce((a, b) => a + b, 0);
+  $('tiles').innerHTML = `
+    <div class="tile"><span class="muted">Latest duration</span><b>${last != null ? fmtDur(last) : '–'}</b></div>
+    <div class="tile"><span class="muted">vs median of previous 10</span><b>${delta != null ? (delta > 0 ? '+' : '') + delta + '%' : '–'}</b></div>
+    <div class="tile"><span class="muted">Latest run</span><b>${day(lastRun.t)}</b></div>
+    <div class="tile"><span class="muted">Latest passed / total</span><b>${lastRun.status.PASSED ?? 0} / ${total}</b></div>
+    <div class="tile"><span class="muted">Runs tracked</span><b>${runs.length}</b></div>`;
+}
+
+async function loadFile(f) {
+  runs = (await (await fetch('data/' + f)).json()).map(r => ({ ...r, t: +toDate(r.start) }));
+  const sections = [...new Set(runs.flatMap(r => Object.keys(r.sections)))].sort();
+  const tests = [...new Set(runs.flatMap(r => Object.keys(r.durations)))].sort();
+  const prev = $('metric').value;
+  $('metric').innerHTML =
+    (sections.length ? `<optgroup label="ptest sections">${sections.map(s => `<option value="s:${s}">${s}</option>`).join('')}</optgroup>` : '') +
+    `<optgroup label="tests">${tests.map(t => `<option value="t:${t}">${t}</option>`).join('')}</optgroup>`;
+  if ([...$('metric').options].some(o => o.value === prev)) $('metric').value = prev;
+  drawDuration();
+
+  const statuses = [...new Set(runs.flatMap(r => Object.keys(r.status)))].sort();
+  chart('status', statuses.map(s => ({ label: s, borderColor: css(STATUS[s] || '--series-1'), backgroundColor: css(STATUS[s] || '--series-1'),
+    data: runs.map(r => ({ x: r.t, y: r.status[s] ?? 0 })) })), v => v);
+
+  const recent = runs.slice(-50).reverse();
+  $('table').innerHTML = `<tr><th>Start (UTC)</th><th>poky commit</th><th>${$('metric').selectedOptions[0]?.text ?? ''}</th>${statuses.map(s => `<th>${s}</th>`).join('')}</tr>` +
+    recent.map(r => `<tr><td>${new Date(r.t).toISOString().slice(0, 16).replace('T', ' ')}</td><td><code>${(r.commit || '').slice(0, 10)}</code></td>` +
+      `<td>${metricValue(r, $('metric').value) ?? '–'}</td>${statuses.map(s => `<td>${r.status[s] ?? 0}</td>`).join('')}</tr>`).join('');
+}
+
+(async () => {
+  const files = await (await fetch('data/index.json')).json();
+  $('file').innerHTML = files.map(f => `<option>${f}</option>`).join('');
+  $('file').onchange = () => loadFile($('file').value);
+  $('metric').onchange = () => loadFile($('file').value);
+  loadFile(files[0]);
+})();
+</script>
+</body>
+</html>
