@@ -46,7 +46,7 @@ a { color: var(--series-1); }
 <p>Test durations and results over time, from <a href="https://git.yoctoproject.org/yocto-testresults/">yocto-testresults</a> (master).</p>
 
 <div class="controls">
-  <label>Result set <select id="file"></select></label>
+  <div id="path" style="display: contents"></div>
   <label>Duration metric <select id="metric"></select></label>
 </div>
 
@@ -72,7 +72,15 @@ const STATUS = { PASSED: '--good', FAILED: '--bad', ERROR: '--bad', SKIPPED: '--
 const toDate = s => new Date(Date.UTC(+s.slice(0, 4), s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(8, 10), +s.slice(10, 12)));
 const day = t => new Date(t).toISOString().slice(0, 10);
 const fmtDur = s => s === 0 ? '0' : s >= 60 ? `${(s / 60).toFixed(1)} min` : `${s.toFixed(3)} s`;
-let runs = [], charts = {};
+// Dropdown labels for the path segments under each top-level directory of
+// yocto-testresults. Directories not listed fall back to "Level N".
+const LEVELS = {
+  runtime: ['Distro', 'Machine', 'Image'],
+  sdk: ['Machine', 'SDK machine', 'Image'],
+  sdkext: ['Machine', 'SDK machine', 'Image'],
+  oeselftest: ['Series', 'Machine'],
+};
+let runs = [], charts = {}, files = [], current;
 
 function chart(id, datasets, fmt) {
   charts[id]?.destroy();
@@ -141,12 +149,29 @@ async function loadFile(f) {
       `<td>${metricValue(r, $('metric').value) ?? '–'}</td>${statuses.map(s => `<td>${r.status[s] ?? 0}</td>`).join('')}</tr>`).join('');
 }
 
+// One dropdown per path segment, each listing only what exists under the
+// selections above it. Previous selections are kept where they still exist.
+function renderPath() {
+  const prev = [...$('path').querySelectorAll('select')].map(el => el.value);
+  const parts = files.map(f => f.replace(/\.json$/, '').split('/'));
+  const chosen = [], html = [];
+  for (let i = 0; ; i++) {
+    const opts = [...new Set(parts.filter(p => p.length > i && chosen.every((c, j) => p[j] === c)).map(p => p[i]))].sort();
+    if (!opts.length) break;
+    chosen.push(opts.includes(prev[i]) ? prev[i] : opts[0]);
+    const label = i === 0 ? 'Test type' : LEVELS[chosen[0]]?.[i - 1] ?? `Level ${i}`;
+    html.push(`<label>${label} <select>${opts.map(o => `<option${o === chosen[i] ? ' selected' : ''}>${o}</option>`).join('')}</select></label>`);
+  }
+  $('path').innerHTML = html.join('');
+  $('path').querySelectorAll('select').forEach(el => el.onchange = renderPath);
+  current = chosen.join('/') + '.json';
+  loadFile(current);
+}
+
 (async () => {
-  const files = await (await fetch('data/index.json')).json();
-  $('file').innerHTML = files.map(f => `<option>${f}</option>`).join('');
-  $('file').onchange = () => loadFile($('file').value);
-  $('metric').onchange = () => loadFile($('file').value);
-  loadFile(files[0]);
+  files = await (await fetch('data/index.json')).json();
+  $('metric').onchange = () => loadFile(current);
+  renderPath();
 })();
 </script>
 </body>
