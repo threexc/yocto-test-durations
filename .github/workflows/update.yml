@@ -1,0 +1,60 @@
+name: Update dashboard
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      depth:
+        description: "Commits of yocto-testresults history to fetch (~8MB each)"
+        default: "10"
+
+concurrency:
+  group: update-dashboard
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The upstream server does not support partial clones (--filter), so the
+      # depth is the only way to bound the download. Results land about once a
+      # day; the default depth covers several days of missed runs. Older
+      # history is backfilled locally from a full clone (see README).
+      - name: Shallow-clone yocto-testresults
+        run: |
+          git clone --quiet --no-checkout --single-branch --branch master \
+            --depth "${{ inputs.depth || '10' }}" \
+            https://git.yoctoproject.org/yocto-testresults/ /tmp/yocto-testresults
+
+      - name: Extract new runs
+        run: |
+          python3 scripts/test_extract.py
+          python3 scripts/extract.py /tmp/yocto-testresults
+
+      - name: Commit data
+        run: |
+          git add site/data
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "data: update from yocto-testresults"
+          git push origin HEAD:main
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
