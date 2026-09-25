@@ -1,12 +1,6 @@
 # Glob patterns (fnmatch) of testresults.json paths in yocto-testresults to track.
 # Add lines to expand coverage; the next backfill/update picks them up.
 
-runtime/poky/qemuriscv64/core-image-ptest-bzip2/testresults.json
-runtime/poky/qemuriscv64/core-image-ptest-coreutils/testresults.json
-runtime/poky/qemuriscv64/core-image-ptest-gnutls/testresults.json
-runtime/poky/qemuarm64/core-image-ptest-bzip2/testresults.json
-runtime/poky/qemuarm64/core-image-ptest-coreutils/testresults.json
-runtime/poky/qemuarm64/core-image-ptest-gnutls/testresults.json
-runtime/poky/qemux86-64/core-image-ptest-bzip2/testresults.json
-runtime/poky/qemux86-64/core-image-ptest-coreutils/testresults.json
-runtime/poky/qemux86-64/core-image-ptest-gnutls/testresults.json
+runtime/poky/qemuarm64/core-image-ptest-*/testresults.json
+runtime/poky/qemuriscv64/core-image-ptest-*/testresults.json
+runtime/poky/qemux86-64/core-image-ptest-*/testresults.json
