@@ -8,19 +8,25 @@
 :root {
   color-scheme: light;
   --surface: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --grid: #e4e3df;
-  --series-1: #2a78d6; --good: #008300; --warn: #c98500; --bad: #e34948; --neutral: #8a8984;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+  --series-5: #e87ba4; --series-6: #008300; --series-7: #4a3aa7; --series-8: #e34948;
+  --good: #008300; --warn: #c98500; --bad: #e34948; --neutral: #8a8984;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --surface: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --grid: #383835;
-    --series-1: #3987e5; --good: #2f9e2f; --warn: #c98500; --bad: #e66767; --neutral: #8a8984;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+    --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
+    --good: #2f9e2f; --warn: #c98500; --bad: #e66767; --neutral: #8a8984;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --surface: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --grid: #383835;
-  --series-1: #3987e5; --good: #2f9e2f; --warn: #c98500; --bad: #e66767; --neutral: #8a8984;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
+  --good: #2f9e2f; --warn: #c98500; --bad: #e66767; --neutral: #8a8984;
 }
 body { margin: 0; padding: 16px; background: var(--surface); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
 main { max-width: 1100px; margin: 0 auto; }
@@ -38,6 +44,9 @@ select { font: inherit; padding: 6px; max-width: 100%; }
 table { border-collapse: collapse; font-size: .85rem; width: 100%; }
 td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 a { color: var(--series-1); }
+fieldset { flex: 1 1 280px; margin: 0; padding: 4px 8px 8px; border: 1px solid var(--grid); border-radius: 4px; font-size: .85rem; color: var(--muted); }
+fieldset label { display: inline-flex; flex-direction: row; align-items: center; margin-right: 16px; color: var(--text); font-size: .95rem; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; }
 </style>
 </head>
 <body>
@@ -55,7 +64,7 @@ a { color: var(--series-1); }
 <h2 id="dur-title">Duration</h2>
 <div class="chart"><canvas id="dur" aria-label="Duration over time"></canvas></div>
 
-<h2>Result counts</h2>
+<h2 id="status-title">Result counts</h2>
 <div class="chart"><canvas id="status" aria-label="Result counts over time"></canvas></div>
 
 <details>
@@ -80,9 +89,17 @@ const LEVELS = {
   sdkext: ['Machine', 'SDK machine', 'Image'],
   oeselftest: ['Series', 'Machine'],
 };
-let runs = [], charts = {}, files = [], current;
+// Categorical slots are assigned to options in their fixed sort order, so a
+// machine keeps its color whichever others are shown. Only levels with 2-8
+// options can be compared: the palette has 8 slots.
+const MAX_SERIES = 8;
+let files = [], series = [], charts = {}, cache = {}, compare = -1, picked = null;
+
+const loadRuns = path => cache[path] ??= fetch('data/' + path).then(r => r.json())
+  .then(rows => rows.map(r => ({ ...r, t: +toDate(r.start) })));
 
 function chart(id, datasets, fmt) {
+  const xs = datasets.flatMap(d => d.data.map(p => p.x));
   charts[id]?.destroy();
   charts[id] = new Chart($(id), {
     type: 'line',
@@ -92,13 +109,13 @@ function chart(id, datasets, fmt) {
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       elements: { line: { borderWidth: 2 }, point: { radius: 0, hoverRadius: 5, hitRadius: 8 } },
       scales: {
-        x: { type: 'linear', min: runs[0]?.t, max: runs.at(-1)?.t, ticks: { callback: day, color: css('--muted'), maxTicksLimit: 8 }, grid: { color: css('--grid') } },
+        x: { type: 'linear', min: Math.min(...xs), max: Math.max(...xs), ticks: { callback: day, color: css('--muted'), maxTicksLimit: 8 }, grid: { color: css('--grid') } },
         y: { beginAtZero: true, ticks: { callback: fmt, color: css('--muted') }, grid: { color: css('--grid') } },
       },
       plugins: {
         legend: { display: datasets.length > 1, labels: { color: css('--text') } },
         tooltip: { callbacks: {
-          title: items => { const r = runs[items[0].dataIndex]; return `${day(items[0].parsed.x)}  oe-core ${(r.commit || '').slice(0, 10)}`; },
+          title: items => `${day(items[0].parsed.x)}  oe-core ${(items[0].raw.r.commit || '').slice(0, 10)}`,
           label: i => `${i.dataset.label}: ${fmt(i.parsed.y)}`,
         } },
       },
@@ -110,67 +127,115 @@ function metricValue(r, m) {
   return (m[0] === 's' ? r.sections : r.durations)[m.slice(2)] ?? null;
 }
 
-function drawDuration() {
-  const m = $('metric').value, label = m.slice(2);
-  $('dur-title').textContent = `Duration: ${label}`;
-  chart('dur', [{ label, borderColor: css('--series-1'), backgroundColor: css('--series-1'), showLine: false, pointRadius: 3, pointHoverRadius: 6,
-    data: runs.map(r => ({ x: r.t, y: metricValue(r, m) })) }], fmtDur);
-
+function stats(runs, m) {
   const vals = runs.map(r => metricValue(r, m)).filter(v => v != null);
   const last = vals.at(-1), prev = vals.slice(-11, -1).sort((a, b) => a - b), med = prev[prev.length >> 1];
-  const delta = med ? ((last - med) / med * 100).toFixed(1) : null;
-  const lastRun = runs.at(-1), total = Object.values(lastRun.status).reduce((a, b) => a + b, 0);
-  $('tiles').innerHTML = `
-    <div class="tile"><span class="muted">Latest duration</span><b>${last != null ? fmtDur(last) : '–'}</b></div>
-    <div class="tile"><span class="muted">vs median of previous 10</span><b>${delta != null ? (delta > 0 ? '+' : '') + delta + '%' : '–'}</b></div>
-    <div class="tile"><span class="muted">Latest run</span><b>${day(lastRun.t)}</b></div>
-    <div class="tile"><span class="muted">Latest passed / total</span><b>${lastRun.status.PASSED ?? 0} / ${total}</b></div>
-    <div class="tile"><span class="muted">Runs tracked</span><b>${runs.length}</b></div>`;
+  return {
+    last: last != null ? fmtDur(last) : '–',
+    delta: med ? `${last > med ? '+' : ''}${((last - med) / med * 100).toFixed(1)}%` : '–',
+  };
 }
 
-async function loadFile(f) {
-  runs = (await (await fetch('data/' + f)).json()).map(r => ({ ...r, t: +toDate(r.start) }));
-  const sections = [...new Set(runs.flatMap(r => Object.keys(r.sections)))].sort();
-  const tests = [...new Set(runs.flatMap(r => Object.keys(r.durations)))].sort();
-  const prev = $('metric').value;
+const total = r => Object.values(r.status).reduce((a, b) => a + b, 0);
+
+function draw() {
+  const m = $('metric').value, name = m.slice(2), comparing = compare >= 0;
+  $('dur-title').textContent = `Duration: ${name}`;
+  chart('dur', series.map(s => ({
+    label: comparing ? s.name : name, borderColor: s.color, backgroundColor: s.color,
+    pointBackgroundColor: s.color, pointBorderColor: css('--surface'), pointBorderWidth: 1,
+    showLine: false, pointRadius: 3, pointHoverRadius: 6,
+    data: s.runs.map(r => ({ x: r.t, y: metricValue(r, m), r })),
+  })), fmtDur);
+
+  if (comparing) {
+    $('tiles').innerHTML = series.map(s => {
+      const st = stats(s.runs, m);
+      return `<div class="tile"><span class="muted"><span class="swatch" style="background:${s.color}"></span>${s.name} latest (vs median of previous 10)</span><b>${st.last} <span class="muted">${st.delta}</span></b></div>`;
+    }).join('');
+  } else {
+    const { runs } = series[0], st = stats(runs, m), lastRun = runs.at(-1);
+    $('tiles').innerHTML = `
+      <div class="tile"><span class="muted">Latest duration</span><b>${st.last}</b></div>
+      <div class="tile"><span class="muted">vs median of previous 10</span><b>${st.delta}</b></div>
+      <div class="tile"><span class="muted">Latest run</span><b>${day(lastRun.t)}</b></div>
+      <div class="tile"><span class="muted">Latest passed / total</span><b>${lastRun.status.PASSED ?? 0} / ${total(lastRun)}</b></div>
+      <div class="tile"><span class="muted">Runs tracked</span><b>${runs.length}</b></div>`;
+  }
+
+  // Test counts differ between machines, so compare pass rates instead.
+  const all = series.flatMap(s => s.runs.map(r => ({ ...r, series: s.name })));
+  const statuses = [...new Set(all.flatMap(r => Object.keys(r.status)))].sort();
+  $('status-title').textContent = comparing ? 'Pass rate' : 'Result counts';
+  chart('status', comparing
+    ? series.map(s => ({ label: s.name, borderColor: s.color, backgroundColor: s.color,
+        data: s.runs.map(r => ({ x: r.t, y: 100 * (r.status.PASSED ?? 0) / (total(r) || 1), r })) }))
+    : statuses.map(st => ({ label: st, borderColor: css(STATUS[st] || '--series-1'), backgroundColor: css(STATUS[st] || '--series-1'),
+        data: series[0].runs.map(r => ({ x: r.t, y: r.status[st] ?? 0, r })) })),
+    comparing ? v => `${+v.toFixed(1)}%` : v => v);
+
+  const recent = all.sort((a, b) => b.t - a.t).slice(0, 50);
+  $('table').innerHTML = `<tr><th>Start (UTC)</th>${comparing ? `<th>${series.level}</th>` : ''}<th>oe-core commit</th><th>Duration (s)</th>${statuses.map(s => `<th>${s}</th>`).join('')}</tr>` +
+    recent.map(r => `<tr><td>${new Date(r.t).toISOString().slice(0, 16).replace('T', ' ')}</td>${comparing ? `<td>${r.series}</td>` : ''}<td><code>${(r.commit || '').slice(0, 10)}</code></td>` +
+      `<td>${metricValue(r, m) ?? '–'}</td>${statuses.map(s => `<td>${r.status[s] ?? 0}</td>`).join('')}</tr>`).join('');
+}
+
+async function load(list, level) {
+  series = await Promise.all(list.map(async s => ({ ...s, runs: await loadRuns(s.path) })));
+  series.level = level;
+  const keys = k => [...new Set(series.flatMap(s => s.runs.flatMap(r => Object.keys(r[k]))))].sort();
+  const sections = keys('sections'), tests = keys('durations'), prev = $('metric').value;
   $('metric').innerHTML =
     (sections.length ? `<optgroup label="ptest sections">${sections.map(s => `<option value="s:${s}">${s}</option>`).join('')}</optgroup>` : '') +
     `<optgroup label="tests">${tests.map(t => `<option value="t:${t}">${t}</option>`).join('')}</optgroup>`;
   if ([...$('metric').options].some(o => o.value === prev)) $('metric').value = prev;
-  drawDuration();
-
-  const statuses = [...new Set(runs.flatMap(r => Object.keys(r.status)))].sort();
-  chart('status', statuses.map(s => ({ label: s, borderColor: css(STATUS[s] || '--series-1'), backgroundColor: css(STATUS[s] || '--series-1'),
-    data: runs.map(r => ({ x: r.t, y: r.status[s] ?? 0 })) })), v => v);
-
-  const recent = runs.slice(-50).reverse();
-  $('table').innerHTML = `<tr><th>Start (UTC)</th><th>oe-core commit</th><th>Duration (s)</th>${statuses.map(s => `<th>${s}</th>`).join('')}</tr>` +
-    recent.map(r => `<tr><td>${new Date(r.t).toISOString().slice(0, 16).replace('T', ' ')}</td><td><code>${(r.commit || '').slice(0, 10)}</code></td>` +
-      `<td>${metricValue(r, $('metric').value) ?? '–'}</td>${statuses.map(s => `<td>${r.status[s] ?? 0}</td>`).join('')}</tr>`).join('');
+  draw();
 }
 
-// One dropdown per path segment, each listing only what exists under the
+// One control per path segment, each listing only what exists under the
 // selections above it. Previous selections are kept where they still exist.
+// The level being compared becomes a set of checkboxes, one series each.
 function renderPath() {
-  const prev = [...$('path').querySelectorAll('select')].map(el => el.value);
+  const prev = Object.fromEntries([...$('path').querySelectorAll('select[data-level]')].map(el => [el.dataset.level, el.value]));
   const parts = files.map(f => f.replace(/\.json$/, '').split('/'));
-  const chosen = [], html = [];
+  const chosen = [], html = [], comparable = [];
+  let options = [], compareLabel;
   for (let i = 0; ; i++) {
-    const opts = [...new Set(parts.filter(p => p.length > i && chosen.every((c, j) => p[j] === c)).map(p => p[i]))].sort();
+    const opts = [...new Set(parts.filter(p => p.length > i && chosen.every((c, j) => c === null || p[j] === c)).map(p => p[i]))].sort();
     if (!opts.length) break;
-    chosen.push(opts.includes(prev[i]) ? prev[i] : opts[0]);
     const label = i === 0 ? 'Test type' : LEVELS[chosen[0]]?.[i - 1] ?? `Level ${i}`;
-    html.push(`<label>${label} <select>${opts.map(o => `<option${o === chosen[i] ? ' selected' : ''}>${o}</option>`).join('')}</select></label>`);
+    const canCompare = i > 0 && opts.length > 1 && opts.length <= MAX_SERIES;
+    if (canCompare) comparable.push(`<option value="${i}"${i === compare ? ' selected' : ''}>${label}</option>`);
+    if (i === compare && canCompare) {
+      chosen.push(null);
+      options = opts, compareLabel = label;
+      html.push(`<fieldset><legend>${label}</legend>${opts.map((o, n) =>
+        `<label><input type="checkbox" value="${o}"${!picked || picked.has(o) ? ' checked' : ''}><span class="swatch" style="background:var(--series-${n + 1})"></span>${o}</label>`).join('')}</fieldset>`);
+    } else {
+      if (i === compare) compare = -1;
+      chosen.push(opts.includes(prev[i]) ? prev[i] : opts[0]);
+      html.push(`<label>${label} <select data-level="${i}">${opts.map(o => `<option${o === chosen[i] ? ' selected' : ''}>${o}</option>`).join('')}</select></label>`);
+    }
   }
+  if (compare >= chosen.length) compare = -1;
+  html.push(`<label>Compare <select id="compare"><option value="-1">nothing</option>${comparable.join('')}</select></label>`);
   $('path').innerHTML = html.join('');
-  $('path').querySelectorAll('select').forEach(el => el.onchange = renderPath);
-  current = chosen.join('/') + '.json';
-  loadFile(current);
+  $('path').querySelectorAll('select[data-level]').forEach(el => el.onchange = renderPath);
+  $('compare').onchange = () => { compare = +$('compare').value; picked = null; renderPath(); };
+
+  if (compare < 0) return load([{ path: chosen.join('/') + '.json', color: css('--series-1') }]);
+  const have = new Set(files), boxes = [...$('path').querySelectorAll('fieldset input')];
+  const list = options.map((o, n) => ({ name: o, color: css(`--series-${n + 1}`), path: chosen.map(c => c ?? o).join('/') + '.json' }));
+  // An option without this result set (e.g. an image not built for that machine) can't be picked.
+  boxes.forEach((b, n) => { b.disabled = !have.has(list[n].path); if (b.disabled) b.checked = false; });
+  boxes.forEach(b => b.onchange = () => { picked = new Set(boxes.filter(x => x.checked).map(x => x.value)); renderPath(); });
+  const shown = list.filter((s, n) => boxes[n].checked);
+  if (shown.length) load(shown, compareLabel);
 }
 
 (async () => {
   files = await (await fetch('data/index.json')).json();
-  $('metric').onchange = () => loadFile(current);
+  $('metric').onchange = draw;
   renderPath();
 })();
 </script>
