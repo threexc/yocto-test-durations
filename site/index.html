@@ -136,7 +136,7 @@ async function loadFile(f) {
     data: runs.map(r => ({ x: r.t, y: r.status[s] ?? 0 })) })), v => v);
 
   const recent = runs.slice(-50).reverse();
-  $('table').innerHTML = `<tr><th>Start (UTC)</th><th>oe-core commit</th><th>${$('metric').selectedOptions[0]?.text ?? ''}</th>${statuses.map(s => `<th>${s}</th>`).join('')}</tr>` +
+  $('table').innerHTML = `<tr><th>Start (UTC)</th><th>oe-core commit</th><th>Duration (s)</th>${statuses.map(s => `<th>${s}</th>`).join('')}</tr>` +
     recent.map(r => `<tr><td>${new Date(r.t).toISOString().slice(0, 16).replace('T', ' ')}</td><td><code>${(r.commit || '').slice(0, 10)}</code></td>` +
       `<td>${metricValue(r, $('metric').value) ?? '–'}</td>${statuses.map(s => `<td>${r.status[s] ?? 0}</td>`).join('')}</tr>`).join('');
 }
