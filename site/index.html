@@ -93,6 +93,8 @@ const LEVELS = {
 // machine keeps its color whichever others are shown. Only levels with 2-8
 // options can be compared: the palette has 8 slots.
 const MAX_SERIES = 8;
+// Preferred initial selections; a level with none of these falls back to its first option.
+const DEFAULTS = ['qemuriscv64'];
 let files = [], series = [], charts = {}, cache = {}, compare = -1, picked = null;
 
 const loadRuns = path => cache[path] ??= fetch('data/' + path).then(r => r.json())
@@ -213,7 +215,7 @@ function renderPath() {
         `<label><input type="checkbox" value="${o}"${!picked || picked.has(o) ? ' checked' : ''}><span class="swatch" style="background:var(--series-${n + 1})"></span>${o}</label>`).join('')}</fieldset>`);
     } else {
       if (i === compare) compare = -1;
-      chosen.push(opts.includes(prev[i]) ? prev[i] : opts[0]);
+      chosen.push(opts.includes(prev[i]) ? prev[i] : opts.find(o => DEFAULTS.includes(o)) ?? opts[0]);
       html.push(`<label>${label} <select data-level="${i}">${opts.map(o => `<option${o === chosen[i] ? ' selected' : ''}>${o}</option>`).join('')}</select></label>`);
     }
   }
