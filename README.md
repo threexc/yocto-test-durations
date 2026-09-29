@@ -1,6 +1,8 @@
 # test-track
 
-Test result tracker for https://git.yoctoproject.org/yocto-testresults/
+Test result tracker for https://git.yoctoproject.org/yocto-testresults/.
+
+See the dashboard [here](https://threexc.github.io/yocto-test-durations/).
 
 ## Dashboard
 
