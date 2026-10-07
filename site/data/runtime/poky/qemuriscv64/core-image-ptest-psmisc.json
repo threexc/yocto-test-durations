@@ -1,0 +1,3 @@
+[
+{"commit": "cc848c403aa3832453f1adfaa45411b8b72b9363", "durations": {"parselogs.ParseLogsTest.test_get_context": 0.001, "parselogs.ParseLogsTest.test_parselogs": 4.4, "ping.PingTest.test_ping": 0.028, "ptest.PtestRunnerTest.test_ptestrunner_expectfail": 8.273, "ptest.PtestRunnerTest.test_ptestrunner_expectsuccess": 0.0, "ssh.SSHTest.test_ssh": 1.067}, "id": "runtime_core-image-ptest-psmisc_qemuriscv64_20261006020717", "sections": {"psmisc": 6.0}, "start": "20261006020717", "status": {"PASSED": 82, "SKIPPED": 1}}
+]
