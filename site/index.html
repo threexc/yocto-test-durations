@@ -35,10 +35,10 @@ h2 { font-size: 1rem; margin: 24px 0 8px; }
 p, .muted { color: var(--muted); }
 .controls { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); min-width: 0; flex: 1 1 280px; }
-select, input[type=number] { font: inherit; padding: 4px 6px; box-sizing: border-box; height: 2.4em; max-width: 100%; }
+select, input[type=number], input[type=date] { font: inherit; padding: 4px 6px; box-sizing: border-box; height: 2.4em; max-width: 100%; }
 label.narrow { flex: 0 0 auto; }
 #min { width: 10ch; }
-.pair { display: flex; gap: 4px; }
+.pair { display: flex; flex-wrap: wrap; gap: 4px; }
 .tiles { display: flex; flex-wrap: wrap; gap: 12px; }
 .tile { flex: 1 1 130px; border: 1px solid var(--grid); border-radius: 8px; padding: 12px; }
 .tile b { display: block; font-size: 1.5rem; }
@@ -61,6 +61,7 @@ fieldset label { display: inline-flex; flex-direction: row; align-items: center;
   <div id="path" style="display: contents"></div>
   <label>Duration metric <select id="metric"></select></label>
   <label class="narrow">Minimum duration <span class="pair"><input id="min" type="number" min="0" step="any" value="30"><select id="unit" aria-label="Minimum duration unit"><option value="1">s</option><option value="60">m</option></select></span></label>
+  <label>Time range <span class="pair"><select id="range"><option value="">All</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="730">Last 2 years</option><option value="custom">Custom</option></select><input id="from" type="date" aria-label="From"><input id="to" type="date" aria-label="To"></span></label>
 </div>
 
 <div class="tiles" id="tiles"></div>
@@ -106,7 +107,7 @@ let files = [], shards = {}, series = [], charts = {}, cache = {}, compare = -1,
 const loadRuns = path => cache[path] ??= Promise.all(shards[path].map(f => fetch('data/' + f).then(r => r.json())))
   .then(parts => parts.flat().map(r => ({ ...r, t: +toDate(r.start) })));
 
-function chart(id, datasets, fmt) {
+function chart(id, datasets, fmt, lo, hi) {
   const xs = datasets.flatMap(d => d.data.map(p => p.x));
   charts[id]?.destroy();
   charts[id] = new Chart($(id), {
@@ -117,7 +118,7 @@ function chart(id, datasets, fmt) {
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       elements: { line: { borderWidth: 2 }, point: { radius: 0, hoverRadius: 5, hitRadius: 8 } },
       scales: {
-        x: { type: 'linear', min: xs.length ? Math.min(...xs) : undefined, max: xs.length ? Math.max(...xs) : undefined, ticks: { callback: day, color: css('--muted'), maxTicksLimit: 8 }, grid: { color: css('--grid') } },
+        x: { type: 'linear', min: isFinite(lo) ? lo : xs.length ? Math.min(...xs) : undefined, max: isFinite(hi) ? hi : xs.length ? Math.max(...xs) : undefined, ticks: { callback: day, color: css('--muted'), maxTicksLimit: 8 }, grid: { color: css('--grid') } },
         y: { beginAtZero: true, ticks: { callback: fmt, color: css('--muted') }, grid: { color: css('--grid') } },
       },
       plugins: {
@@ -150,14 +151,19 @@ const passed = r => (r.status.PASSED ?? 0) + (r.status.PASS ?? 0);
 function draw() {
   const m = $('metric').value, name = m.slice(2), comparing = compare >= 0;
   // Charts only show runs whose selected metric took at least the minimum.
-  const min = (+$('min').value || 0) * $('unit').value, shown = runs => runs.filter(r => (metricValue(r, m) ?? -1) >= min);
+  // ...and that started within the time range. Presets count back from the
+  // latest run shown, so series that stopped reporting still show something.
+  const range = $('range').value, latest = Math.max(...series.map(s => s.runs.at(-1)?.t ?? 0));
+  if (range !== 'custom') { $('from').value = range ? day(latest - range * 864e5) : ''; $('to').value = ''; }
+  const lo = $('from').value ? Date.parse($('from').value) : -Infinity, hi = $('to').value ? Date.parse($('to').value) + 864e5 : Infinity;
+  const min = (+$('min').value || 0) * $('unit').value, shown = runs => runs.filter(r => (metricValue(r, m) ?? -1) >= min && r.t >= lo && r.t < hi);
   $('dur-title').textContent = `Duration: ${name}`;
   chart('dur', series.map(s => ({
     label: comparing ? s.name : name, borderColor: s.color, backgroundColor: s.color,
     pointBackgroundColor: s.color, pointBorderColor: css('--surface'), pointBorderWidth: 1,
     showLine: false, pointRadius: 3, pointHoverRadius: 6,
     data: shown(s.runs).map(r => ({ x: r.t, y: metricValue(r, m), r })),
-  })), fmtDur);
+  })), fmtDur, lo, hi);
 
   if (comparing) {
     $('tiles').innerHTML = series.map(s => {
@@ -183,7 +189,7 @@ function draw() {
         data: shown(s.runs).map(r => ({ x: r.t, y: 100 * passed(r) / (total(r) || 1), r })) }))
     : statuses.map(st => ({ label: st, borderColor: css(STATUS[st] || '--series-1'), backgroundColor: css(STATUS[st] || '--series-1'),
         data: shown(series[0].runs).map(r => ({ x: r.t, y: r.status[st] ?? 0, r })) })),
-    comparing ? v => `${+v.toFixed(1)}%` : v => v);
+    comparing ? v => `${+v.toFixed(1)}%` : v => v, lo, hi);
 
   const recent = all.sort((a, b) => b.t - a.t).slice(0, 50);
   $('table').innerHTML = `<tr><th>Start (UTC)</th>${comparing ? `<th>${series.level}</th>` : ''}<th>oe-core commit</th><th>Duration (s)</th>${statuses.map(s => `<th>${s}</th>`).join('')}</tr>` +
@@ -247,7 +253,8 @@ function renderPath() {
 (async () => {
   for (const f of await (await fetch('data/index.json')).json()) (shards[f.replace(/\/\d{4}\.json$/, '.json')] ??= []).push(f);
   files = Object.keys(shards);
-  $('metric').onchange = $('min').oninput = draw;
+  $('metric').onchange = $('min').oninput = $('range').onchange = draw;
+  $('from').oninput = $('to').oninput = () => { $('range').value = 'custom'; draw(); };
   // Convert the entered value so switching units doesn't change the filter.
   let unit = 1;
   $('unit').onchange = () => { $('min').value = +($('min').value * unit / $('unit').value).toFixed(3); unit = +$('unit').value; draw(); };
