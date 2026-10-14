@@ -157,7 +157,8 @@ function draw() {
   if (range !== 'custom') { $('from').value = range ? day(latest - range * 864e5) : ''; $('to').value = ''; }
   const lo = $('from').value ? Date.parse($('from').value) : -Infinity, hi = $('to').value ? Date.parse($('to').value) + 864e5 : Infinity;
   const min = (+$('min').value || 0) * $('unit').value, shown = runs => runs.filter(r => (metricValue(r, m) ?? -1) >= min && r.t >= lo && r.t < hi);
-  $('dur-title').textContent = `Duration: ${name}`;
+  const empty = !series.some(s => shown(s.runs).length);
+  $('dur-title').textContent = `Duration: ${name}` + (empty ? ` (no runs of at least ${fmtDur(min)} in this time range)` : '');
   chart('dur', series.map(s => ({
     label: comparing ? s.name : name, borderColor: s.color, backgroundColor: s.color,
     pointBackgroundColor: s.color, pointBorderColor: css('--surface'), pointBorderWidth: 1,
