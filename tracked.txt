@@ -4,3 +4,11 @@
 runtime/poky/qemuarm64/core-image-ptest-*/testresults.json
 runtime/poky/qemuriscv64/core-image-ptest-*/testresults.json
 runtime/poky/qemux86-64/core-image-ptest-*/testresults.json
+# oe-selftest series. The toolchain series (*-tc, and the older per-machine
+# oeselftest/qemu*/qemu* dirs) are skipped: ~400GB of history to parse for ~21
+# timed tests per run.
+oeselftest/oeqa/*/testresults.json
+oeselftest/oe-selftest*/*/testresults.json
+oeselftest/a-*/*/testresults.json
+oeselftest/reproducible*/*/testresults.json
+oeselftest/bringup/*/testresults.json
