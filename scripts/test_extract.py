@@ -1,3 +1,7 @@
+import tempfile
+from pathlib import Path
+
+import extract
 from extract import summarize
 
 run = {
@@ -17,4 +21,11 @@ assert summarize(run) == {
     "sections": {"coreutils": 1637.0},
     "status": {"PASSED": 2, "SKIPPED": 1},
 }
+
+with tempfile.TemporaryDirectory() as tmp:
+    extract.DATA = Path(tmp)
+    runs = {i: {"id": i, "start": s} for i, s in [("a", "20251231235959"), ("b", "20260101000000")]}
+    extract.save("x/y/testresults.json", runs)
+    assert sorted(f.name for f in (extract.DATA / "x/y").iterdir()) == ["2025.json", "2026.json"]
+    assert extract.load("x/y/testresults.json") == runs
 print("ok")

@@ -6,6 +6,8 @@ Usage: extract.py <yocto-testresults clone>
 Walks every commit reachable from HEAD in the clone, so it works with shallow
 clones: backfill once from a deep clone, then update from shallow ones. Runs
 already present in site/data/ are kept; new ones are merged in by run id.
+Each testresults.json path is stored as one file per year of runs, keeping
+every file well under GitHub's 100MB limit.
 """
 import collections
 import fnmatch
@@ -31,21 +33,23 @@ def summarize(run):
     }
 
 
-def out_path(path):
-    return DATA / (path.removesuffix("/testresults.json") + ".json")
+def out_dir(path):
+    return DATA / path.removesuffix("/testresults.json")
 
 
 def load(path):
-    f = out_path(path)
-    return {r["id"]: r for r in json.loads(f.read_text())} if f.exists() else {}
+    return {r["id"]: r for f in out_dir(path).glob("*.json") for r in json.loads(f.read_text())}
 
 
 def save(path, runs):
-    f = out_path(path)
-    f.parent.mkdir(parents=True, exist_ok=True)
-    rows = sorted(runs.values(), key=lambda r: r["start"])
-    # One run per line keeps git diffs of the data small and readable.
-    f.write_text("[\n" + ",\n".join(json.dumps(r, sort_keys=True) for r in rows) + "\n]\n")
+    d = out_dir(path)
+    d.mkdir(parents=True, exist_ok=True)
+    years = collections.defaultdict(list)
+    for r in sorted(runs.values(), key=lambda r: r["start"]):
+        years[r["start"][:4]].append(r)
+    for year, rows in years.items():
+        # One run per line keeps git diffs of the data small and readable.
+        (d / f"{year}.json").write_text("[\n" + ",\n".join(json.dumps(r, sort_keys=True) for r in rows) + "\n]\n")
 
 
 def main():
