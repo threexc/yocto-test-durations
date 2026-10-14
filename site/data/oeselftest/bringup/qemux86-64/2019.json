@@ -1,7 +1,0 @@
-[
-{"commit": "be52da152a4d9f9e798844f592ec9ae7e051c658", "durations": {}, "id": "oeselftest_ubuntu-18.04_qemux86-64_20190212142506", "sections": {}, "start": "20190212142506", "status": {"FAILED": 83, "PASSED": 250, "SKIPPED": 2, "UNKNOWN": 3}},
-{"commit": "be52da152a4d9f9e798844f592ec9ae7e051c658", "durations": {}, "id": "oeselftest_opensusetumbleweed-20190205_qemux86-64_20190212235010", "sections": {}, "start": "20190212235010", "status": {"ERROR": 10, "FAILED": 2, "PASSED": 324, "SKIPPED": 2}},
-{"commit": "be52da152a4d9f9e798844f592ec9ae7e051c658", "durations": {}, "id": "oeselftest_opensuseleap-15.0_qemux86-64_20190212235736", "sections": {}, "start": "20190212235736", "status": {"ERROR": 22, "FAILED": 3, "PASSED": 311, "SKIPPED": 2}},
-{"commit": "be52da152a4d9f9e798844f592ec9ae7e051c658", "durations": {}, "id": "oeselftest_fedora-29_qemux86-64_20190213004244", "sections": {}, "start": "20190213004244", "status": {"ERROR": 22, "FAILED": 3, "PASSED": 311, "SKIPPED": 2}},
-{"commit": "2fcbc079e2792030606117e21f4e70e111d4fd1a", "durations": {}, "id": "oeselftest_opensusetumbleweed-20190205_qemux86-64_20190214102107", "sections": {}, "start": "20190214102107", "status": {"ERROR": 10, "FAILED": 2, "PASSED": 324, "SKIPPED": 2}}
-]

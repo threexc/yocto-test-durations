@@ -1,5 +1,0 @@
-[
-{"commit": "ca3993cc4b13d4e661228cee6fb9448adfd0a4ba", "durations": {}, "id": "oeselftest_debian-10_qemux86_20200122162448", "sections": {}, "start": "20200122162448", "status": {"PASSED": 1}},
-{"commit": "83771beb99462366e5eada75e2687ae6a1bd0890", "durations": {}, "id": "oeselftest_debian-8_qemux86_20200216120523", "sections": {}, "start": "20200216120523", "status": {"PASSED": 1}},
-{"commit": "83771beb99462366e5eada75e2687ae6a1bd0890", "durations": {}, "id": "oeselftest_fedora-30_qemux86_20200216224301", "sections": {}, "start": "20200216224301", "status": {"PASSED": 1}}
-]
