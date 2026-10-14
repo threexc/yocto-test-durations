@@ -81,7 +81,8 @@ fieldset label { display: inline-flex; flex-direction: row; align-items: center;
 <script>
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const $ = id => document.getElementById(id);
-const STATUS = { PASSED: '--good', FAILED: '--bad', ERROR: '--bad', SKIPPED: '--neutral', EXPECTEDFAIL: '--warn' };
+// Toolchain selftests report DejaGnu statuses (PASS, FAIL, XFAIL...) alongside the oeqa ones.
+const STATUS = { PASSED: '--good', PASS: '--good', FAILED: '--bad', FAIL: '--bad', ERROR: '--bad', SKIPPED: '--neutral', EXPECTEDFAIL: '--warn', XFAIL: '--warn' };
 const toDate = s => new Date(Date.UTC(+s.slice(0, 4), s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(8, 10), +s.slice(10, 12)));
 const day = t => new Date(t).toISOString().slice(0, 10);
 const fmtDur = s => s === 0 ? '0' : s >= 60 ? `${(s / 60).toFixed(1)} min` : `${s.toFixed(3)} s`;
@@ -98,11 +99,12 @@ const LEVELS = {
 // options can be compared: the palette has 8 slots.
 const MAX_SERIES = 8;
 // Preferred initial selections; a level with none of these falls back to its first option.
-const DEFAULTS = ['qemuriscv64'];
-let files = [], series = [], charts = {}, cache = {}, compare = -1, picked = null;
+const DEFAULTS = ['runtime', 'oeqa', 'qemuriscv64'];
+let files = [], shards = {}, series = [], charts = {}, cache = {}, compare = -1, picked = null;
 
-const loadRuns = path => cache[path] ??= fetch('data/' + path).then(r => r.json())
-  .then(rows => rows.map(r => ({ ...r, t: +toDate(r.start) })));
+// Each result set is stored as one file per year: <path>/<year>.json.
+const loadRuns = path => cache[path] ??= Promise.all(shards[path].map(f => fetch('data/' + f).then(r => r.json())))
+  .then(parts => parts.flat().map(r => ({ ...r, t: +toDate(r.start) })));
 
 function chart(id, datasets, fmt) {
   const xs = datasets.flatMap(d => d.data.map(p => p.x));
@@ -143,6 +145,7 @@ function stats(runs, m) {
 }
 
 const total = r => Object.values(r.status).reduce((a, b) => a + b, 0);
+const passed = r => (r.status.PASSED ?? 0) + (r.status.PASS ?? 0);
 
 function draw() {
   const m = $('metric').value, name = m.slice(2), comparing = compare >= 0;
@@ -167,7 +170,7 @@ function draw() {
       <div class="tile"><span class="muted">Latest duration</span><b>${st.last}</b></div>
       <div class="tile"><span class="muted">vs median of previous 10</span><b>${st.delta}</b></div>
       <div class="tile"><span class="muted">Latest run</span><b>${day(lastRun.t)}</b></div>
-      <div class="tile"><span class="muted">Latest passed / total</span><b>${lastRun.status.PASSED ?? 0} / ${total(lastRun)}</b></div>
+      <div class="tile"><span class="muted">Latest passed / total</span><b>${passed(lastRun)} / ${total(lastRun)}</b></div>
       <div class="tile"><span class="muted">Runs tracked</span><b>${runs.length}</b></div>`;
   }
 
@@ -177,7 +180,7 @@ function draw() {
   $('status-title').textContent = comparing ? 'Pass rate' : 'Result counts';
   chart('status', comparing
     ? series.map(s => ({ label: s.name, borderColor: s.color, backgroundColor: s.color,
-        data: shown(s.runs).map(r => ({ x: r.t, y: 100 * (r.status.PASSED ?? 0) / (total(r) || 1), r })) }))
+        data: shown(s.runs).map(r => ({ x: r.t, y: 100 * passed(r) / (total(r) || 1), r })) }))
     : statuses.map(st => ({ label: st, borderColor: css(STATUS[st] || '--series-1'), backgroundColor: css(STATUS[st] || '--series-1'),
         data: shown(series[0].runs).map(r => ({ x: r.t, y: r.status[st] ?? 0, r })) })),
     comparing ? v => `${+v.toFixed(1)}%` : v => v);
@@ -242,7 +245,8 @@ function renderPath() {
 }
 
 (async () => {
-  files = await (await fetch('data/index.json')).json();
+  for (const f of await (await fetch('data/index.json')).json()) (shards[f.replace(/\/\d{4}\.json$/, '.json')] ??= []).push(f);
+  files = Object.keys(shards);
   $('metric').onchange = $('min').oninput = draw;
   // Convert the entered value so switching units doesn't change the filter.
   let unit = 1;
