@@ -43,11 +43,11 @@ def load(path):
 
 def save(path, runs):
     d = out_dir(path)
-    d.mkdir(parents=True, exist_ok=True)
     years = collections.defaultdict(list)
     for r in sorted(runs.values(), key=lambda r: r["start"]):
         years[r["start"][:4]].append(r)
     for year, rows in years.items():
+        d.mkdir(parents=True, exist_ok=True)
         # One run per line keeps git diffs of the data small and readable.
         (d / f"{year}.json").write_text("[\n" + ",\n".join(json.dumps(r, sort_keys=True) for r in rows) + "\n]\n")
 
@@ -83,7 +83,10 @@ def main():
             store = stores.setdefault(path, load(path))
             for run_id, run in json.loads(blob(sha)).items():
                 if run_id not in store:
-                    store[run_id] = {"id": run_id, **summarize(run)}
+                    s = summarize(run)
+                    # Runs without timings (e.g. pre-2020 oeselftest) can't be charted.
+                    if s["durations"] or s["sections"]:
+                        store[run_id] = {"id": run_id, **s}
 
     for path, runs in stores.items():
         save(path, runs)
