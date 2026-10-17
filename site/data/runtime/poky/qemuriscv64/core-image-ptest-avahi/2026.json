@@ -1,0 +1,3 @@
+[
+{"commit": "7803450fd5ecc1bb714abadfbe3ec340e930139a", "durations": {"parselogs.ParseLogsTest.test_get_context": 0.0, "parselogs.ParseLogsTest.test_parselogs": 3.494, "ping.PingTest.test_ping": 0.02, "ptest.PtestRunnerTest.test_ptestrunner_expectfail": 1.679, "ptest.PtestRunnerTest.test_ptestrunner_expectsuccess": 0.0, "ssh.SSHTest.test_ssh": 0.793}, "id": "runtime_core-image-ptest-avahi_qemuriscv64_20261016020734", "sections": {"avahi": 0.0}, "start": "20261016020734", "status": {"PASSED": 13, "SKIPPED": 1}}
+]
