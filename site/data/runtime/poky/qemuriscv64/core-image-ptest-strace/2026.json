@@ -1,0 +1,3 @@
+[
+{"commit": "7993331246ac675eef1712ea7fba770518cef5b1", "durations": {"parselogs.ParseLogsTest.test_get_context": 0.001, "parselogs.ParseLogsTest.test_parselogs": 3.167, "ping.PingTest.test_ping": 0.03, "ptest.PtestRunnerTest.test_ptestrunner_expectfail": 795.935, "ptest.PtestRunnerTest.test_ptestrunner_expectsuccess": 0.001, "ssh.SSHTest.test_ssh": 0.726}, "id": "runtime_core-image-ptest-strace_qemuriscv64_20261019215104", "sections": {"strace": 794.0}, "start": "20261019215104", "status": {"PASSED": 1086, "SKIPPED": 409}}
+]
