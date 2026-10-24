@@ -1,0 +1,3 @@
+[
+{"commit": "ae5cafacec8e99c5a27fa5b3b378eefc595910ef", "durations": {"parselogs.ParseLogsTest.test_get_context": 0.0, "parselogs.ParseLogsTest.test_parselogs": 4.421, "ping.PingTest.test_ping": 0.028, "ptest.PtestRunnerTest.test_ptestrunner_expectfail": 46.523, "ptest.PtestRunnerTest.test_ptestrunner_expectsuccess": 0.0, "ssh.SSHTest.test_ssh": 0.935}, "id": "runtime_core-image-ptest-libsoup_qemuriscv64_20261023020145", "sections": {"libsoup": 44.0}, "start": "20261023020145", "status": {"PASSED": 39, "SKIPPED": 1}}
+]

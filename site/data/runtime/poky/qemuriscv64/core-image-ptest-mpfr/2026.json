@@ -1,0 +1,3 @@
+[
+{"commit": "ae5cafacec8e99c5a27fa5b3b378eefc595910ef", "durations": {"parselogs.ParseLogsTest.test_get_context": 0.001, "parselogs.ParseLogsTest.test_parselogs": 4.35, "ping.PingTest.test_ping": 0.03, "ptest.PtestRunnerTest.test_ptestrunner_expectfail": 368.515, "ptest.PtestRunnerTest.test_ptestrunner_expectsuccess": 0.001, "ssh.SSHTest.test_ssh": 0.971}, "id": "runtime_core-image-ptest-mpfr_qemuriscv64_20261023020145", "sections": {"mpfr": 366.0}, "start": "20261023020145", "status": {"PASSED": 198, "SKIPPED": 3}}
+]
