@@ -1,0 +1,3 @@
+[
+{"commit": "9518ce9aa2a6cbce678895ef9a95cd27939dae2a", "durations": {"parselogs.ParseLogsTest.test_get_context": 0.001, "parselogs.ParseLogsTest.test_parselogs": 3.604, "ping.PingTest.test_ping": 0.041, "ptest.PtestRunnerTest.test_ptestrunner_expectfail": 6.665, "ptest.PtestRunnerTest.test_ptestrunner_expectsuccess": 0.001, "ssh.SSHTest.test_ssh": 0.903}, "id": "runtime_core-image-ptest-libclass-inspector-perl_qemuriscv64_20261117012654", "sections": {"libclass-inspector-perl": 5.0}, "start": "20261117012654", "status": {"PASSED": 10, "SKIPPED": 2}}
+]
